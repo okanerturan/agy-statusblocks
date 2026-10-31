@@ -33,9 +33,24 @@ function parseResetTime(v: unknown): number {
   return 0;
 }
 
-function shortenBucketLabel(rawKey: string): string {
+function inferWindowSuffix(resetSec: number): string {
+  if (!resetSec || resetSec <= 0) return '';
+  if (resetSec > 18 * 3600) return '7d';
+  return '5h';
+}
+
+function shortenBucketLabel(rawKey: string, resetSec = 0): string {
   const k = rawKey.trim();
   const lower = k.toLowerCase();
+  const explicitWin = lower.includes('weekly') || lower.includes('7d') || lower.includes('7-day')
+    ? '7d'
+    : lower.includes('5h') || lower.includes('5-hour')
+      ? '5h'
+      : inferWindowSuffix(resetSec);
+
+  if (lower.includes('claude') && (lower.includes('gpt') || lower.includes('pool') || (!lower.includes('sonnet') && !lower.includes('opus') && !lower.includes('haiku')))) {
+    return explicitWin ? `claude ${explicitWin}` : 'claude';
+  }
   if (lower.includes('sonnet')) {
     const ver = k.match(/\d+(?:\.\d+)?/)?.[0] ?? '';
     return ver ? `sonnet ${ver}` : 'sonnet';
@@ -48,11 +63,20 @@ function shortenBucketLabel(rawKey: string): string {
     const ver = k.match(/\d+(?:\.\d+)?/)?.[0] ?? '';
     return ver ? `haiku ${ver}` : 'haiku';
   }
-  if (lower.includes('flash')) return 'flash';
+  if (lower.includes('flash')) return explicitWin === '7d' ? 'flash 7d' : 'flash';
   if (lower.includes('argon')) return 'argon';
-  if (lower.includes('pro')) return 'pro';
+  if (lower.includes('pro')) return explicitWin === '7d' ? 'pro 7d' : 'pro';
+  if (lower.includes('gemini')) return explicitWin ? `gemini ${explicitWin}` : 'gemini';
   const cleaned = k.replace(/\s*\(.*?\)\s*/g, '').replace(/^gemini\s+/i, '').replace(/^claude\s+/i, '').trim();
   return cleaned.length > 12 ? cleaned.slice(0, 12) : (cleaned || k);
+}
+
+function bucketPool(key: string): 'claude' | 'argon' | 'gemini' | 'other' {
+  const k = key.toLowerCase();
+  if (k.includes('claude') || k.includes('sonnet') || k.includes('opus') || k.includes('haiku') || k.includes('gpt')) return 'claude';
+  if (k.includes('argon')) return 'argon';
+  if (k.includes('gemini') || k.includes('flash') || k.includes('pro')) return 'gemini';
+  return 'other';
 }
 
 function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
@@ -63,18 +87,22 @@ function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
   for (const token of ['sonnet', 'opus', 'haiku', 'flash', 'argon', 'pro']) {
     if (k.includes(token) && (mName.includes(token) || mId.includes(token))) return true;
   }
+  // If active model is Sonnet/Opus and bucket is a shared Claude/GPT pool
+  if ((mName.includes('claude') || mName.includes('sonnet') || mName.includes('opus')) && bucketPool(key) === 'claude') {
+    return true;
+  }
   return false;
 }
 
 function extractLimits(data: AgyStatusData): RemoteLimit[] {
   const out: RemoteLimit[] = [];
 
-  // 1. Quota map if provided natively by Antigravity (includes Gemini + Claude Sonnet/Opus buckets)
+  // 1. Quota map if provided natively by Antigravity (includes Gemini + Argon + Claude/GPT pools)
   if (data.quota && typeof data.quota === 'object') {
     const entries = Object.entries(data.quota)
       .filter(([, bucket]) => bucket && typeof bucket === 'object' && !bucket.disabled);
 
-    // Sort active model's bucket first, then by highest utilization
+    // Sort active model's bucket first, then prefer showing distinct pools (Gemini/Argon + Claude), then by highest utilization
     entries.sort(([keyA, a], [keyB, b]) => {
       const actA = isActiveModelBucket(keyA, data) ? 1 : 0;
       const actB = isActiveModelBucket(keyB, data) ? 1 : 0;
@@ -90,10 +118,12 @@ function extractLimits(data: AgyStatusData): RemoteLimit[] {
         ? (1 - bucket.remaining_fraction) * 100
         : bucket.used_percentage;
       const pct = clampPercent(rawPct);
+      const nowSec = Math.floor(Date.now() / 1000);
       const resetsAt = typeof bucket.reset_in_seconds === 'number' && bucket.reset_in_seconds > 0
-        ? Math.floor(Date.now() / 1000) + bucket.reset_in_seconds
+        ? nowSec + bucket.reset_in_seconds
         : parseResetTime(bucket.reset_time ?? bucket.resets_at);
-      const label = shortenBucketLabel(key);
+      const resetSec = resetsAt > nowSec ? resetsAt - nowSec : (bucket.reset_in_seconds ?? 0);
+      const label = shortenBucketLabel(key, resetSec);
       if (seenLabels.has(label)) continue;
       seenLabels.add(label);
       out.push({ label, percent: pct, resetsAt });

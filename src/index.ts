@@ -146,7 +146,7 @@ process.stdin.on('end', () => {
     }
 
     const config = loadConfig();
-    if (config.remoteUsage !== false) {
+    if (config.remoteUsage === true) {
       maybeRefreshRemoteUsage();
     }
 

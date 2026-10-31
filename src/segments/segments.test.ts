@@ -110,4 +110,36 @@ describe('segments', () => {
     expect(plain).toContain('opus 5.5');
     expect(plain).toContain('60%');
   });
+
+  it('supports shared Claude/GPT pool and Argon weekly pool buckets', () => {
+    const poolData: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: {
+        id: 'gemini-4-argon',
+        display_name: 'Gemini 4 Argon (Low)',
+        effort: 'low',
+      },
+      quota: {
+        'Gemini 3.8 Flash': {
+          remaining_fraction: 0.85,
+          reset_in_seconds: 3600 * 3,
+        },
+        'Gemini 4 Argon': {
+          remaining_fraction: 0.72,
+          reset_in_seconds: 86400 * 4,
+        },
+        'Claude and GPT': {
+          remaining_fraction: 0.60,
+          reset_in_seconds: 3600 * 4,
+        },
+      },
+    };
+    const block = usageSegment.render(poolData, 100);
+    const plain = block.lines.map(stripAnsi).join('\n');
+    expect(plain).toContain('argon');
+    expect(plain).toContain('28%');
+    expect(plain).toContain('claude 5h');
+    expect(plain).toContain('40%');
+  });
 });
