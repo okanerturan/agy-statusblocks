@@ -1,0 +1,43 @@
+{
+  "name": "agy-statusblocks",
+  "version": "0.1.0",
+  "description": "Adaptive, block-based status line for Antigravity CLI (agy) with bin-packing layout and live agent telemetry",
+  "type": "module",
+  "bin": {
+    "agy-statusblocks": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "preview": "node dist/cli.js preview"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "gemini",
+    "statusline",
+    "status-bar",
+    "terminal",
+    "cli",
+    "ansi",
+    "bin-packing",
+    "layout"
+  ],
+  "author": "Okan Turan",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
