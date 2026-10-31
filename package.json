@@ -13,6 +13,7 @@
     "postinstall.cjs"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "postinstall": "node postinstall.cjs",
     "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc",
