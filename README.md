@@ -47,14 +47,30 @@ On narrow/split-pane terminals, the layout degrades gracefully to stacked single
 
 ```json
 {
-  "segments": ["context", "model", "usage", "state", "git"]
+  "segments": ["context", "model", "usage", "state", "git"],
+  "border": "rounded"
 }
 ```
 
-Or via environment:
+Border styles supported:
+- `rounded` (default) — `╭─╮` `╰─╯` `│` `─`
+- `square` — `┌─┐` `└─┘` `│` `─`
+- `double` — `╔═╗` `╚═╝` `║` `═`
+- `thick` — `┏━┓` `┗━┛` `┃` `━`
+- `ascii` — `+-+` `+-+` `|` `-` (clean standard 7-bit ASCII)
+- `none` — clean padded columns without frame borders
+
+Or configure via environment variables:
 
 ```sh
 AGY_STATUSBLOCKS_SEGMENTS=context,model,usage
+AGY_STATUSBLOCKS_BORDER=double
+```
+
+Or pass via CLI flag:
+
+```sh
+npx agy-statusblocks preview --border double
 ```
 
 ## Preview

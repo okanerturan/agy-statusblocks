@@ -71,8 +71,11 @@ export interface Segment {
   enabled(data: AgyStatusData): boolean;
 }
 
+export type BorderStyle = 'rounded' | 'square' | 'double' | 'thick' | 'ascii' | 'none';
+
 export interface StatusBlocksConfig {
   segments?: string[];
   stackWithDefault?: boolean;
   remoteUsage?: boolean;
+  border?: BorderStyle;
 }

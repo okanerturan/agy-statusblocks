@@ -44,4 +44,55 @@ describe('layout', () => {
     const out = render(data, 100, customConfig);
     expect(out).toContain('╭─');
   });
+
+  describe('border styles', () => {
+    it('renders square borders', () => {
+      const out = render(data, 120, { border: 'square' });
+      const plain = stripAnsi(out);
+      expect(plain).toContain('┌─');
+      expect(plain).toContain('└─');
+      expect(plain).not.toContain('╭─');
+    });
+
+    it('renders double borders', () => {
+      const out = render(data, 120, { border: 'double' });
+      const plain = stripAnsi(out);
+      expect(plain).toContain('╔═');
+      expect(plain).toContain('╚═');
+      expect(plain).not.toContain('╭─');
+    });
+
+    it('renders thick borders', () => {
+      const out = render(data, 120, { border: 'thick' });
+      const plain = stripAnsi(out);
+      expect(plain).toContain('┏━');
+      expect(plain).toContain('┗━');
+      expect(plain).not.toContain('╭─');
+    });
+
+    it('renders ascii borders', () => {
+      const out = render(data, 120, { border: 'ascii' });
+      const plain = stripAnsi(out);
+      expect(plain).toContain('+-');
+      expect(plain).toContain('|');
+      expect(plain).not.toContain('╭─');
+    });
+
+    it('renders none border style cleanly without box borders', () => {
+      const out = render(data, 120, { border: 'none' });
+      const plain = stripAnsi(out);
+      expect(plain).not.toContain('╭─');
+      expect(plain).not.toContain('┌─');
+      expect(plain).not.toContain('╔═');
+      expect(plain).not.toContain('┏━');
+      expect(plain).toContain('Gemini 3.8 Flash');
+    });
+
+    it('falls back to rounded for unknown border style', () => {
+      const out = render(data, 120, { border: 'unknown-style' as any });
+      const plain = stripAnsi(out);
+      expect(plain).toContain('╭─');
+      expect(plain).toContain('╰─');
+    });
+  });
 });

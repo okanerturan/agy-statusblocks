@@ -142,4 +142,34 @@ describe('segments', () => {
     expect(plain).toContain('claude 5h');
     expect(plain).toContain('40%');
   });
+
+  it('aligns reset timers and bucket labels so gemini 5h and 7d lean right flush', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      quota: {
+        'Gemini (5h)': {
+          used_percentage: 48,
+          reset_in_seconds: 2 * 3600 + 50 * 60,
+        },
+        'Gemini (7d)': {
+          used_percentage: 12,
+          reset_in_seconds: 6 * 86400 + 21 * 3600 + 50 * 60,
+        },
+      },
+    };
+    const block = usageSegment.render(data, 100);
+    const line1 = stripAnsi(block.lines[0]!);
+    const line2 = stripAnsi(block.lines[1]!);
+
+    // Both lines must have identical visible width (no trailing ragged space after 5h)
+    expect(line1.length).toBe(line2.length);
+
+    // Both lines must end with the bucket label flush right
+    expect(line1.endsWith('gemini 5h')).toBe(true);
+    expect(line2.endsWith('gemini 7d')).toBe(true);
+
+    // Both labels must start at the exact same column index
+    expect(line1.indexOf('gemini 5h')).toBe(line2.indexOf('gemini 7d'));
+  });
 });

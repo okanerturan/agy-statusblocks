@@ -1,4 +1,4 @@
-import type { Segment, Block, AgyStatusData, StatusBlocksConfig } from './types.js';
+import type { Segment, Block, AgyStatusData, StatusBlocksConfig, BorderStyle } from './types.js';
 import { padRight, color, c, visibleLength } from './colors.js';
 
 import { contextSegment } from './segments/context.js';
@@ -11,39 +11,76 @@ const ALL_SEGMENTS: Segment[] = [contextSegment, modelSegment, usageSegment, sta
 export const DEFAULT_ORDER = ['context', 'model', 'usage', 'state', 'git'];
 
 const GAP = 1;
-const BOX_CHROME = 4; // ╭─ ... ─╮ has 2 border chars + 2 inner spaces
+
+export interface BorderGlyphs {
+  tl: string;
+  tr: string;
+  bl: string;
+  br: string;
+  h: string;
+  v: string;
+}
+
+export const BORDER_STYLES: Record<BorderStyle, BorderGlyphs> = {
+  rounded: { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│' },
+  square:  { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' },
+  double:  { tl: '╔', tr: '╗', bl: '╚', br: '╝', h: '═', v: '║' },
+  thick:   { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃' },
+  ascii:   { tl: '+', tr: '+', bl: '+', br: '+', h: '-', v: '|' },
+  none:    { tl: '',  tr: '',  bl: '',  br: '',  h: '',  v: ''  },
+};
 
 type RowGroup = { blocks: Block[]; widths: number[] };
 
-function boxify(lines: string[], innerW: number, title?: string): string[] {
+export function boxify(lines: string[], innerW: number, style: BorderStyle = 'rounded', title?: string): string[] {
+  if (style === 'none') {
+    const boxed: string[] = [];
+    if (title) {
+      boxed.push(' ' + color(title, c.dim) + ' '.repeat(Math.max(0, innerW + 1 - title.length)));
+    }
+    for (const line of lines) {
+      boxed.push(' ' + padRight(line, innerW) + ' ');
+    }
+    return boxed;
+  }
+
+  const g = BORDER_STYLES[style] || BORDER_STYLES.rounded;
   let top: string;
   if (title) {
     const label = ` ${title} `;
     const remaining = Math.max(0, innerW + 2 - label.length - 1);
-    top = color('╭─', c.gray) + color(label, c.dim) + color('─'.repeat(remaining) + '╮', c.gray);
+    top = color(g.tl + g.h, c.gray) + color(label, c.dim) + color(g.h.repeat(remaining) + g.tr, c.gray);
   } else {
-    top = color('╭' + '─'.repeat(innerW + 2) + '╮', c.gray);
+    top = color(g.tl + g.h.repeat(innerW + 2) + g.tr, c.gray);
   }
-  const bot = color('╰' + '─'.repeat(innerW + 2) + '╯', c.gray);
+  const bot = color(g.bl + g.h.repeat(innerW + 2) + g.br, c.gray);
   const boxed = [top];
   for (const line of lines) {
-    boxed.push(color('│', c.gray) + ' ' + padRight(line, innerW) + ' ' + color('│', c.gray));
+    boxed.push(color(g.v, c.gray) + ' ' + padRight(line, innerW) + ' ' + color(g.v, c.gray));
   }
   boxed.push(bot);
   return boxed;
 }
 
-function renderRow(group: RowGroup): string[] {
+export function renderRow(group: RowGroup, style: BorderStyle = 'rounded'): string[] {
   const { blocks, widths } = group;
-  const boxes = blocks.map((b, i) => boxify(b.lines, widths[i]!, b.id));
-  const boxWidths = widths.map(w => w + BOX_CHROME);
+  const chrome = style === 'none' ? 2 : 4;
+  const boxes = blocks.map((b, i) => boxify(b.lines, widths[i]!, style, b.id));
+  const boxWidths = widths.map(w => w + chrome);
+  const g = BORDER_STYLES[style] || BORDER_STYLES.rounded;
 
   const maxHeight = Math.max(...boxes.map(b => b.length));
   for (let i = 0; i < boxes.length; i++) {
     const box = boxes[i]!;
     while (box.length < maxHeight) {
-      const blankRow = color('│', c.gray) + ' '.repeat(widths[i]! + 2) + color('│', c.gray);
-      box.splice(box.length - 1, 0, blankRow);
+      const blankRow = style === 'none'
+        ? ' '.repeat(widths[i]! + 2)
+        : color(g.v, c.gray) + ' '.repeat(widths[i]! + 2) + color(g.v, c.gray);
+      if (style === 'none') {
+        box.push(blankRow);
+      } else {
+        box.splice(box.length - 1, 0, blankRow);
+      }
     }
   }
 
@@ -75,13 +112,13 @@ function decodeAssignment(
 
 function computeRowWidths(
   blockRow: number[], blockCount: number, targetRows: number,
-  blockWidths: number[], rowWidths: number[],
+  blockWidths: number[], rowWidths: number[], chrome: number,
 ): void {
   rowWidths.fill(0, 0, targetRows);
   const rowCounts = new Array<number>(targetRows).fill(0);
   for (let b = 0; b < blockCount; b++) {
     const r = blockRow[b]!;
-    rowWidths[r] = (rowWidths[r] ?? 0) + (blockWidths[b] ?? 0) + BOX_CHROME;
+    rowWidths[r] = (rowWidths[r] ?? 0) + (blockWidths[b] ?? 0) + chrome;
     rowCounts[r] = (rowCounts[r] ?? 0) + 1;
   }
   for (let r = 0; r < targetRows; r++) {
@@ -91,10 +128,10 @@ function computeRowWidths(
   }
 }
 
-function solveGreedy(blocks: Block[], maxWidth: number): RowGroup[] {
+function solveGreedy(blocks: Block[], maxWidth: number, chrome: number): RowGroup[] {
   const rows: { blocks: Block[]; widths: number[]; currentW: number }[] = [];
   for (const b of blocks) {
-    const boxW = b.width + BOX_CHROME;
+    const boxW = b.width + chrome;
     let placed = false;
     for (const r of rows) {
       const addedW = r.blocks.length > 0 ? boxW + GAP : boxW;
@@ -114,10 +151,10 @@ function solveGreedy(blocks: Block[], maxWidth: number): RowGroup[] {
   return rows.map(r => ({ blocks: r.blocks, widths: r.widths }));
 }
 
-function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
+function solveLayout(blocks: Block[], maxWidth: number, chrome: number): RowGroup[] {
   if (blocks.length === 0) return [];
   const blockCount = blocks.length;
-  if (blockCount > 6) return solveGreedy(blocks, maxWidth);
+  if (blockCount > 6) return solveGreedy(blocks, maxWidth, chrome);
   const blockWidths = blocks.map(b => b.width);
 
   for (let targetRows = 1; targetRows <= blockCount; targetRows++) {
@@ -131,7 +168,7 @@ function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
 
     for (let combo = 0; combo < totalCombos; combo++) {
       if (!decodeAssignment(combo, blockCount, targetRows, blockRow, rowUsed)) continue;
-      computeRowWidths(blockRow, blockCount, targetRows, blockWidths, rowWidths);
+      computeRowWidths(blockRow, blockCount, targetRows, blockWidths, rowWidths, chrome);
 
       let fits = true;
       let maxRowW = 0;
@@ -158,7 +195,7 @@ function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
             rWidths.push(blocks[b]!.width);
           }
         }
-        const totalW = rWidths.reduce((a, w) => a + w + BOX_CHROME, 0) + (rBlocks.length - 1) * GAP;
+        const totalW = rWidths.reduce((a, w) => a + w + chrome, 0) + (rBlocks.length - 1) * GAP;
         rows.push({ blocks: rBlocks, widths: rWidths, totalW });
       }
 
@@ -172,6 +209,8 @@ function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
 
 export function render(data: AgyStatusData, width: number, config: StatusBlocksConfig = {}): string {
   const order = config.segments ?? DEFAULT_ORDER;
+  const borderStyle: BorderStyle = config.border ?? 'rounded';
+  const chrome = borderStyle === 'none' ? 2 : 4;
   const segmentsMap = new Map<string, Segment>(ALL_SEGMENTS.map(s => [s.id, s]));
 
   const activeSegments = order
@@ -179,11 +218,11 @@ export function render(data: AgyStatusData, width: number, config: StatusBlocksC
     .filter((s): s is Segment => !!s && s.enabled(data));
 
   const blocks = activeSegments.map(s => s.render(data, width));
-  const groups = solveLayout(blocks, width);
+  const groups = solveLayout(blocks, width, chrome);
 
   const lines: string[] = [];
   for (const group of groups) {
-    lines.push(...renderRow(group));
+    lines.push(...renderRow(group, borderStyle));
   }
   return lines.join('\n');
 }

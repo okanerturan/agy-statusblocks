@@ -5,10 +5,10 @@ import { join, dirname, basename, sep } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { render } from './layout.js';
-import { loadConfig } from './config.js';
+import { loadConfig, normalizeBorderStyle, VALID_BORDER_STYLES } from './config.js';
 import { color, c } from './colors.js';
 import { isValidVersion, isNewerVersion } from './version.js';
-import type { AgyStatusData } from './types.js';
+import type { AgyStatusData, BorderStyle } from './types.js';
 
 type Settings = {
   statusLine?: {
@@ -160,9 +160,25 @@ function runUninstall(): void {
   console.log(color('✓ agy-statusblocks uninstalled and reverted to built-in status line', c.green));
 }
 
-function runPreview(): void {
+function parseBorderFlag(argv: string[]): BorderStyle | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--border' || arg === '-b') {
+      const next = argv[i + 1];
+      if (next) return normalizeBorderStyle(next);
+    } else if (arg && arg.startsWith('--border=')) {
+      return normalizeBorderStyle(arg.slice('--border='.length));
+    }
+  }
+  return undefined;
+}
+
+function runPreview(borderOverride?: BorderStyle): void {
   process.env['AGY_STATUSBLOCKS_NO_REMOTE'] = '1';
   const config = loadConfig();
+  if (borderOverride) {
+    config.border = borderOverride;
+  }
   const now = Date.now() / 1000;
   const mockData: AgyStatusData = {
     product: 'antigravity',
@@ -213,7 +229,8 @@ function runPreview(): void {
     },
   };
 
-  console.log(`\n${color('agy-statusblocks', c.bold, c.gemini)} preview\n`);
+  const styleLabel = config.border ?? 'rounded';
+  console.log(`\n${color('agy-statusblocks', c.bold, c.gemini)} preview ${color(`[border: ${styleLabel}]`, c.dim)}\n`);
   for (const width of [120, 80, 50]) {
     console.log(color('─'.repeat(width), c.gray));
     console.log(`${width} cols:`);
@@ -227,12 +244,12 @@ function showHelp(): void {
 ${color('agy-statusblocks', c.bold, c.gemini)} — block-based status line for Antigravity CLI (agy)
 
 ${color('Usage:', c.bold)}
-  agy-statusblocks init       Install into Antigravity CLI settings
-  agy-statusblocks update     Update installed files (--force to downgrade)
-  agy-statusblocks preview    Preview with mock data at various widths
-  agy-statusblocks uninstall  Revert to built-in statusline
-  agy-statusblocks --version  Print the installed package version
-  agy-statusblocks help       Show this help
+  agy-statusblocks init                        Install into Antigravity CLI settings
+  agy-statusblocks update                      Update installed files (--force to downgrade)
+  agy-statusblocks preview [--border <style>]  Preview with mock data at various widths
+  agy-statusblocks uninstall                   Revert to built-in statusline
+  agy-statusblocks --version                   Print the installed package version
+  agy-statusblocks help                        Show this help
 
 ${color('Blocks:', c.bold)}
   context    Context window fill bar, percentage, token counts
@@ -241,20 +258,40 @@ ${color('Blocks:', c.bold)}
   state      Agent state pill and task/subagent/artifact counters
   git        Branch, staged/modified counts, lines added/removed
 
+${color('Borders:', c.bold)}
+  rounded (default), square, double, thick, ascii, none
+
 ${color('Customize:', c.bold)}
-  ~/.agy-statusblocks.json:   { "segments": ["context", "model", "usage", "state", "git"] }
+  ~/.agy-statusblocks.json:   { "segments": ["context", "model", "usage", "state", "git"], "border": "rounded" }
   Env vars:                   AGY_STATUSBLOCKS_SEGMENTS=context,model,usage
+                              AGY_STATUSBLOCKS_BORDER=rounded|square|double|thick|ascii|none
+  CLI flags:                  --border, -b <style>
 `);
 }
 
-const cmd = process.argv[2];
-switch (cmd) {
+const borderFlag = parseBorderFlag(process.argv.slice(2));
+if (borderFlag) {
+  process.env['AGY_STATUSBLOCKS_BORDER'] = borderFlag;
+}
+
+const firstPositional = process.argv.slice(2).find(arg => !arg.startsWith('-'));
+switch (firstPositional) {
   case 'init': runInit(); break;
   case 'update': runUpdate(process.argv.includes('--force')); break;
-  case 'preview': runPreview(); break;
+  case 'preview': runPreview(borderFlag); break;
   case 'uninstall': runUninstall(); break;
-  case '--version': case '-v': console.log(PACKAGE_VERSION); break;
-  case 'help': case '--help': case '-h': showHelp(); break;
+  case undefined:
+    if (process.argv.includes('--version') || process.argv.includes('-v')) {
+      console.log(PACKAGE_VERSION);
+    } else if (process.argv.includes('--help') || process.argv.includes('-h')) {
+      showHelp();
+    } else if (process.stdin.isTTY) {
+      showHelp();
+    } else {
+      import('./index.js');
+    }
+    break;
+  case 'help': showHelp(); break;
   default:
     if (process.stdin.isTTY) { showHelp(); }
     else { import('./index.js'); }

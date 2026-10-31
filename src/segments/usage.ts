@@ -179,13 +179,40 @@ export const usageSegment: Segment = {
     }
 
     const BAR_WIDTH = 8;
-    const rows = limits.slice(0, 2).map(l => {
-      const bar = renderBar(l.percent, BAR_WIDTH);
-      const pctStr = color(`${l.percent}%`, pctColor(l.percent), c.bold);
-      const reset = l.resetsAt ? color(`↻ ${formatResetTime(l.resetsAt)}`, c.dim) : '';
-      const lbl = color(l.label, c.dim);
+    const active = limits.slice(0, 2);
 
-      const parts = [bar, pctStr, reset, lbl].filter(Boolean);
+    const formatted = active.map(l => {
+      const pctStr = `${l.percent}%`;
+      const resetTime = l.resetsAt ? formatResetTime(l.resetsAt) : '';
+      const resetRaw = resetTime ? `↻ ${resetTime}` : '';
+      return {
+        limit: l,
+        pctStr,
+        resetRaw,
+        label: l.label,
+      };
+    });
+
+    const maxPctLen = Math.max(...formatted.map(r => r.pctStr.length));
+    const hasAnyReset = formatted.some(r => r.resetRaw.length > 0);
+    const maxResetLen = hasAnyReset ? Math.max(...formatted.map(r => r.resetRaw.length)) : 0;
+    const maxLabelLen = Math.max(...formatted.map(r => r.label.length));
+
+    const rows = formatted.map(r => {
+      const bar = renderBar(r.limit.percent, BAR_WIDTH);
+      const paddedPct = ' '.repeat(maxPctLen - r.pctStr.length) + r.pctStr;
+      const pctColorStr = color(paddedPct, pctColor(r.limit.percent), c.bold);
+
+      let resetColorStr = '';
+      if (hasAnyReset && r.resetRaw) {
+        const paddedReset = r.resetRaw + ' '.repeat(maxResetLen - r.resetRaw.length);
+        resetColorStr = color(paddedReset, c.dim);
+      }
+
+      const paddedLabel = ' '.repeat(maxLabelLen - r.label.length) + r.label;
+      const lbl = color(paddedLabel, c.dim);
+
+      const parts = [bar, pctColorStr, resetColorStr, lbl].filter(Boolean);
       return parts.join(color(' · ', c.dim));
     });
 
