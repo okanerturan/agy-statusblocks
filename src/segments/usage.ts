@@ -39,6 +39,10 @@ function inferWindowSuffix(resetSec: number): string {
   return '5h';
 }
 
+function is3pKey(lower: string): boolean {
+  return lower === '3p' || lower.startsWith('3p-') || lower.startsWith('3p_') || lower.startsWith('3p ');
+}
+
 function shortenBucketLabel(rawKey: string, resetSec = 0): string {
   const k = rawKey.trim();
   const lower = k.toLowerCase();
@@ -47,6 +51,9 @@ function shortenBucketLabel(rawKey: string, resetSec = 0): string {
     : lower.includes('5h') || lower.includes('5-hour')
       ? '5h'
       : inferWindowSuffix(resetSec);
+
+  // "3p-5h" / "3p-weekly": Antigravity's third-party (Claude/GPT) pool
+  if (is3pKey(lower)) return explicitWin ? `claude ${explicitWin}` : 'claude';
 
   if (lower.includes('claude') && (lower.includes('gpt') || lower.includes('pool') || (!lower.includes('sonnet') && !lower.includes('opus') && !lower.includes('haiku')))) {
     return explicitWin ? `claude ${explicitWin}` : 'claude';
@@ -73,7 +80,7 @@ function shortenBucketLabel(rawKey: string, resetSec = 0): string {
 
 function bucketPool(key: string): 'claude' | 'argon' | 'gemini' | 'other' {
   const k = key.toLowerCase();
-  if (k.includes('claude') || k.includes('sonnet') || k.includes('opus') || k.includes('haiku') || k.includes('gpt')) return 'claude';
+  if (is3pKey(k) || k.includes('claude') || k.includes('sonnet') || k.includes('opus') || k.includes('haiku') || k.includes('gpt')) return 'claude';
   if (k.includes('argon')) return 'argon';
   if (k.includes('gemini') || k.includes('flash') || k.includes('pro')) return 'gemini';
   return 'other';
@@ -88,7 +95,11 @@ function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
     if (k.includes(token) && (mName.includes(token) || mId.includes(token))) return true;
   }
   // If active model is Sonnet/Opus and bucket is a shared Claude/GPT pool
-  if ((mName.includes('claude') || mName.includes('sonnet') || mName.includes('opus')) && bucketPool(key) === 'claude') {
+  if ((mName.includes('claude') || mName.includes('sonnet') || mName.includes('opus') || mName.includes('gpt')) && bucketPool(key) === 'claude') {
+    return true;
+  }
+  // Native Gemini model uses the Gemini pool (but not the separate Argon pool)
+  if (mName.includes('gemini') && !mName.includes('argon') && bucketPool(key) === 'gemini') {
     return true;
   }
   return false;
@@ -107,6 +118,12 @@ function extractLimits(data: AgyStatusData): RemoteLimit[] {
       const actA = isActiveModelBucket(keyA, data) ? 1 : 0;
       const actB = isActiveModelBucket(keyB, data) ? 1 : 0;
       if (actA !== actB) return actB - actA;
+      if (actA && actB) {
+        // Within the active pool, show the short window (5h) before the weekly one
+        const weeklyA = /weekly|7d/i.test(keyA) ? 1 : 0;
+        const weeklyB = /weekly|7d/i.test(keyB) ? 1 : 0;
+        if (weeklyA !== weeklyB) return weeklyA - weeklyB;
+      }
       const pctA = typeof a.remaining_fraction === 'number' ? (1 - a.remaining_fraction) * 100 : (a.used_percentage ?? 0);
       const pctB = typeof b.remaining_fraction === 'number' ? (1 - b.remaining_fraction) * 100 : (b.used_percentage ?? 0);
       return pctB - pctA;

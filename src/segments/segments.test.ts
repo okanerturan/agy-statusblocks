@@ -172,4 +172,37 @@ describe('segments', () => {
     // Both labels must start at the exact same column index
     expect(line1.indexOf('gemini 5h')).toBe(line2.indexOf('gemini 7d'));
   });
+
+  const realQuota = {
+    '3p-5h': { remaining_fraction: 0.88, reset_in_seconds: 10403 },
+    '3p-weekly': { remaining_fraction: 0.94, reset_in_seconds: 597203 },
+    'gemini-5h': { remaining_fraction: 0.48, reset_in_seconds: 9001 },
+    'gemini-weekly': { remaining_fraction: 0.87, reset_in_seconds: 595801 },
+  };
+
+  it('shows the third-party (3p) pool when a Claude model is active', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'Claude Sonnet 5.5 (Medium)', display_name: 'Claude Sonnet 5.5 (Medium)' },
+      quota: realQuota,
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('claude 5h');
+    expect(lines[0]).toContain('12%');
+    expect(lines[1]).toContain('claude 7d');
+    expect(lines[1]).toContain('6%');
+  });
+
+  it('shows the gemini pool when a Gemini model is active', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'gemini-3.8-flash', display_name: 'Gemini 3.8 Flash (High)' },
+      quota: realQuota,
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('gemini 5h');
+    expect(lines[1]).toContain('gemini 7d');
+  });
 });
