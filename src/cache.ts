@@ -4,9 +4,9 @@ import { tmpdir } from 'os';
 import { createHash } from 'crypto';
 
 function cacheDir(create: boolean): string {
-  const override = process.env['AGY_STATUSBLOCKS_CACHE_DIR'] || process.env['CLAUDE_STATUSBLOCKS_CACHE_DIR'];
+  const override = process.env['AGY_STATUSBLOCKS_CACHE_DIR'];
   const uid = typeof process.getuid === 'function' ? `-${process.getuid()}` : '';
-  const dir = override || join(tmpdir(), `claude-statusblocks${uid}`);
+  const dir = override || join(tmpdir(), `agy-statusblocks${uid}`);
   if (create) mkdirSync(dir, { recursive: true });
   return dir;
 }

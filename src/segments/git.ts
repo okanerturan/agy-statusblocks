@@ -38,12 +38,13 @@ function getGitInfo(cwd: string): GitInfo | null {
 
   let info: GitInfo | null = null;
   try {
-    let branch = execSync('git branch --show-current', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    const execOpts = { cwd, encoding: 'utf8' as const, stdio: ['pipe', 'pipe', 'ignore'] as ['pipe', 'pipe', 'ignore'], timeout: 1500 };
+    let branch = execSync('git branch --show-current', execOpts).trim();
     if (!branch) {
-      branch = '@' + execSync('git rev-parse --short HEAD', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+      branch = '@' + execSync('git rev-parse --short HEAD', execOpts).trim();
     }
-    const stagedOut = execSync('git diff --cached --numstat', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-    const modifiedOut = execSync('git diff --numstat', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    const stagedOut = execSync('git diff --cached --numstat', execOpts).trim();
+    const modifiedOut = execSync('git diff --numstat', execOpts).trim();
     const staged = stagedOut ? stagedOut.split('\n').length : 0;
     const modified = modifiedOut ? modifiedOut.split('\n').length : 0;
     let added = 0, removed = 0;

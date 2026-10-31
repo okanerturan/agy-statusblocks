@@ -130,6 +130,10 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 }
 
 let input = '';
+if (process.stdin.isTTY) {
+  process.stdout.write('\n');
+  process.exit(0);
+}
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk: string) => { input += chunk; });
 process.stdin.on('end', () => {

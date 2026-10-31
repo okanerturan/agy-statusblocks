@@ -36,4 +36,12 @@ describe('layout', () => {
 
     expect(narrowLines.length).toBeGreaterThanOrEqual(wideLines.length);
   });
+
+  it('handles more than 6 blocks safely without exponential freeze', () => {
+    const customConfig = {
+      segments: ['context', 'model', 'usage', 'state', 'git', 'context', 'model'],
+    };
+    const out = render(data, 100, customConfig);
+    expect(out).toContain('╭─');
+  });
 });

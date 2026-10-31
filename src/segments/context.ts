@@ -2,9 +2,10 @@ import type { Segment } from '../types.js';
 import { color, c, visibleLength, pctColor, renderBar } from '../colors.js';
 
 function formatTokens(n: number): string {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}K`;
-  return String(n);
+  const safe = Math.max(0, Math.round(n || 0));
+  if (safe >= 1000000) return `${(safe / 1000000).toFixed(1)}M`;
+  if (safe >= 1000) return `${Math.round(safe / 1000)}K`;
+  return String(safe);
 }
 
 export const contextSegment: Segment = {

@@ -91,9 +91,33 @@ function computeRowWidths(
   }
 }
 
+function solveGreedy(blocks: Block[], maxWidth: number): RowGroup[] {
+  const rows: { blocks: Block[]; widths: number[]; currentW: number }[] = [];
+  for (const b of blocks) {
+    const boxW = b.width + BOX_CHROME;
+    let placed = false;
+    for (const r of rows) {
+      const addedW = r.blocks.length > 0 ? boxW + GAP : boxW;
+      if (r.currentW + addedW <= maxWidth) {
+        r.blocks.push(b);
+        r.widths.push(b.width);
+        r.currentW += addedW;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      rows.push({ blocks: [b], widths: [b.width], currentW: boxW });
+    }
+  }
+  rows.sort((a, b) => a.currentW - b.currentW);
+  return rows.map(r => ({ blocks: r.blocks, widths: r.widths }));
+}
+
 function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
   if (blocks.length === 0) return [];
   const blockCount = blocks.length;
+  if (blockCount > 6) return solveGreedy(blocks, maxWidth);
   const blockWidths = blocks.map(b => b.width);
 
   for (let targetRows = 1; targetRows <= blockCount; targetRows++) {

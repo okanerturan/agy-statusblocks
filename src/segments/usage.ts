@@ -15,7 +15,7 @@ function formatResetTime(epochSec: number): string {
   const m = Math.floor((ms % MS_PER_HOUR) / MS_PER_MIN);
   if (d > 0) return `${d}d${h > 0 ? `${h}h` : ''}${m > 0 ? `${m}m` : ''}`;
   if (h > 0) return `${h}h${m > 0 ? `${m}m` : ''}`;
-  return `${m}m`;
+  return m > 0 ? `${m}m` : '<1m';
 }
 
 function clampPercent(v: number | undefined): number {
