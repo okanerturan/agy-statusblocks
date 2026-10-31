@@ -1,9 +1,32 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import type { AgyStatusData } from './types.js';
+import { loadConfig } from './config.js';
 import { render } from './layout.js';
 import { maybeRefreshRemoteUsage } from './remote-usage.js';
+import { spawnDetached } from './spawn.js';
+
+const AUTO_UPDATE_INTERVAL = 86400000; // 24 hours
+
+function maybeAutoUpdate(): void {
+  if (process.env['AGY_STATUSBLOCKS_NO_UPDATE']) return;
+  try {
+    const dir = join(homedir(), '.gemini', 'antigravity-cli', 'statusblocks');
+    if (!existsSync(dir)) return;
+
+    const checkFile = join(dir, '.last-update-check');
+    let lastCheck = 0;
+    try { lastCheck = parseInt(readFileSync(checkFile, 'utf8'), 10) || 0; } catch { /* missing file */ }
+    if (Date.now() - lastCheck < AUTO_UPDATE_INTERVAL) return;
+
+    writeFileSync(checkFile, String(Date.now()));
+    spawnDetached(process.execPath, [join(dir, 'update-check.js')]);
+  } catch { /* auto-update is best-effort */ }
+}
 
 function detectWidth(providedWidth?: number): number {
   if (providedWidth && providedWidth > 0) return providedWidth;
@@ -61,7 +84,6 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 
   const costObj = (obj.cost && typeof obj.cost === 'object') ? obj.cost as Record<string, unknown> : {};
 
-  // Rate limits
   const rlObj = (obj.rate_limits && typeof obj.rate_limits === 'object') ? obj.rate_limits as Record<string, any> : undefined;
   const quotaObj = (obj.quota && typeof obj.quota === 'object') ? obj.quota as Record<string, any> : undefined;
 
@@ -101,9 +123,6 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
   };
 }
 
-// Background refresh of remote usage if needed
-maybeRefreshRemoteUsage();
-
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk: string) => { input += chunk; });
@@ -120,9 +139,15 @@ process.stdin.on('end', () => {
       return;
     }
 
+    const config = loadConfig();
+    if (config.remoteUsage !== false) {
+      maybeRefreshRemoteUsage();
+    }
+
     const width = detectWidth(data.terminal_width);
-    const rendered = render(data, width);
+    const rendered = render(data, width, config);
     process.stdout.write(rendered + '\n');
+    maybeAutoUpdate();
   } catch {
     process.stdout.write('\n');
   }

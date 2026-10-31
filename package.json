@@ -1,7 +1,7 @@
 {
   "name": "agy-statusblocks",
   "version": "0.1.0",
-  "description": "Adaptive, block-based status line for Antigravity CLI (agy) with bin-packing layout and live agent telemetry",
+  "description": "Opinionated, adaptive block-based status line for Antigravity CLI (agy) with bin-packing layout, rate limit tracking, and live agent telemetry",
   "type": "module",
   "bin": {
     "agy-statusblocks": "dist/cli.js"
@@ -9,9 +9,11 @@
   "main": "./dist/index.js",
   "files": [
     "dist",
-    "!dist/**/*.test.*"
+    "!dist/**/*.test.*",
+    "postinstall.cjs"
   ],
   "scripts": {
+    "postinstall": "node postinstall.cjs",
     "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc",
     "dev": "tsc --watch",
@@ -27,17 +29,27 @@
     "terminal",
     "cli",
     "ansi",
+    "box-drawing",
+    "rate-limit",
     "bin-packing",
     "layout"
   ],
+  "homepage": "https://github.com/okanerturan/agy-statusblocks#readme",
+  "bugs": {
+    "url": "https://github.com/okanerturan/agy-statusblocks/issues"
+  },
   "author": "Okan Turan",
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/okanerturan/agy-statusblocks"
+  },
   "engines": {
     "node": ">=20"
   },
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
   }
 }

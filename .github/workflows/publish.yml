@@ -1,0 +1,202 @@
+name: Publish to npm and GitHub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      source_sha: ${{ steps.package.outputs.source_sha }}
+      tag: ${{ steps.package.outputs.tag }}
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@^11.5.1
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: npm test
+      - name: Publish package if needed and resolve its source commit
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package=agy-statusblocks
+          version=$(node -p "require('./package.json').version")
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid package version: $version" >&2
+            exit 1
+          fi
+
+          lookup_log=$(mktemp)
+          if published_version=$(npm view "$package@$version" version 2>"$lookup_log"); then
+            if [[ "$published_version" != "$version" ]]; then
+              echo "Registry returned $published_version for requested version $version" >&2
+              exit 1
+            fi
+            echo "$package@$version is already published; npm publish is not needed"
+          elif grep -q 'E404' "$lookup_log"; then
+            echo "$package@$version is not published; publishing from $GITHUB_SHA"
+            publish_args=(--provenance --access public)
+            if [[ "$version" == *-* ]]; then
+              publish_args+=(--tag next)
+            fi
+            npm publish "${publish_args[@]}"
+          else
+            echo "Could not determine whether $package@$version is published; refusing to publish" >&2
+            sed 's/^/npm: /' "$lookup_log" >&2
+            exit 1
+          fi
+
+          source_sha=
+          for attempt in {1..30}; do
+            source_sha=$(npm view "$package@$version" gitHead 2>/dev/null || true)
+            if [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              break
+            fi
+            echo "Waiting for $package@$version metadata (attempt $attempt/30)"
+            sleep 6
+          done
+
+          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "npm metadata has no valid gitHead for $package@$version; refusing to create a tag" >&2
+            exit 1
+          fi
+          if ! git cat-file -e "$source_sha^{commit}"; then
+            echo "npm gitHead $source_sha is not present in this repository" >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$source_sha" "$GITHUB_SHA"; then
+            echo "npm gitHead $source_sha is not an ancestor of $GITHUB_SHA" >&2
+            exit 1
+          fi
+
+          source_version=$(git show "$source_sha:package.json" | node -e \
+            "let s=''; process.stdin.on('data', d => s += d); process.stdin.on('end', () => console.log(JSON.parse(s).version))")
+          if [[ "$source_version" != "$version" ]]; then
+            echo "npm gitHead $source_sha contains version $source_version, expected $version" >&2
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "tag=v$version"
+            echo "source_sha=$source_sha"
+          } >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Create or backfill the matching GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.publish.outputs.source_sha }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid source commit: $SOURCE_SHA" >&2
+            exit 1
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: $TAG" >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            tag_commit=$(git rev-parse "$TAG^{commit}")
+            if [[ "$tag_commit" != "$SOURCE_SHA" ]]; then
+              echo "$TAG already points to $tag_commit, not npm's $SOURCE_SHA" >&2
+              exit 1
+            fi
+            echo "$TAG already points to npm's published source commit"
+          else
+            if [[ "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "Missing historical tag $TAG for npm gitHead $SOURCE_SHA." >&2
+              exit 1
+            fi
+
+            git tag "$TAG" "$SOURCE_SHA"
+            if ! git push origin "refs/tags/$TAG"; then
+              git tag -d "$TAG"
+              if ! git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"; then
+                echo "Could not create $TAG and no matching concurrent tag exists" >&2
+                exit 1
+              fi
+              tag_commit=$(git rev-parse "$TAG^{commit}")
+              if [[ "$tag_commit" != "$SOURCE_SHA" ]]; then
+                echo "$TAG was concurrently created at $tag_commit, not npm's $SOURCE_SHA" >&2
+                exit 1
+              fi
+            fi
+          fi
+
+          expected_prerelease=false
+          if [[ "$TAG" == *-* ]]; then
+            expected_prerelease=true
+          fi
+
+          release_lookup_log=$(mktemp)
+          if release_state=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '"\(.prerelease) \(.draft)"' 2>"$release_lookup_log"); then
+            read -r actual_prerelease actual_draft <<< "$release_state"
+            if [[ "$actual_draft" != false ]]; then
+              echo "GitHub Release $TAG is still a draft" >&2
+              exit 1
+            fi
+            if [[ "$actual_prerelease" != "$expected_prerelease" ]]; then
+              echo "GitHub Release $TAG prerelease=$actual_prerelease, expected $expected_prerelease" >&2
+              exit 1
+            fi
+            echo "GitHub Release $TAG already exists and matches; nothing to do"
+            exit 0
+          elif ! grep -q 'HTTP 404' "$release_lookup_log"; then
+            echo "Could not determine whether GitHub Release $TAG exists" >&2
+            sed 's/^/github: /' "$release_lookup_log" >&2
+            exit 1
+          fi
+
+          release_args=(
+            "$TAG"
+            --repo "$GITHUB_REPOSITORY"
+            --verify-tag
+            --title "$TAG"
+          )
+          if [[ "$expected_prerelease" == true ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          notes_file=".github/release-notes/$TAG.md"
+          if [[ -f "$notes_file" ]]; then
+            gh release create "${release_args[@]}" \
+              --notes-file "$notes_file"
+          else
+            gh release create "${release_args[@]}" \
+              --generate-notes
+          fi

@@ -65,4 +65,5 @@ export interface Segment {
 export interface StatusBlocksConfig {
   segments?: string[];
   stackWithDefault?: boolean;
+  remoteUsage?: boolean;
 }

@@ -73,7 +73,12 @@ export function storeRemoteLimits(limits: RemoteLimit[]): void {
   writeCache(REMOTE_USAGE_CACHE, limits);
 }
 
+function remoteUsageDisabled(): boolean {
+  return !!(process.env['AGY_STATUSBLOCKS_NO_REMOTE'] || process.env['CLAUDE_STATUSBLOCKS_NO_REMOTE']);
+}
+
 export function readRemoteLimits(): RemoteLimit[] | null {
+  if (remoteUsageDisabled()) return null;
   const entry = readCacheEntry(REMOTE_USAGE_CACHE);
   if (!entry || Date.now() - entry.ts > DISPLAY_TTL) return null;
   if (!Array.isArray(entry.value)) return null;
@@ -81,6 +86,7 @@ export function readRemoteLimits(): RemoteLimit[] | null {
 }
 
 export function maybeRefreshRemoteUsage(): void {
+  if (remoteUsageDisabled()) return;
   const entry = readCacheEntry(REMOTE_USAGE_CACHE);
   const isFresh = entry && Date.now() - entry.ts < REFRESH_INTERVAL;
   if (isFresh) return;
