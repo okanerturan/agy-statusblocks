@@ -3,11 +3,12 @@ import { padRight, color, c, visibleLength } from './colors.js';
 
 import { contextSegment } from './segments/context.js';
 import { modelSegment } from './segments/model.js';
+import { usageSegment } from './segments/usage.js';
 import { stateSegment } from './segments/state.js';
 import { gitSegment } from './segments/git.js';
 
-const ALL_SEGMENTS: Segment[] = [contextSegment, modelSegment, stateSegment, gitSegment];
-export const DEFAULT_ORDER = ['context', 'model', 'state', 'git'];
+const ALL_SEGMENTS: Segment[] = [contextSegment, modelSegment, usageSegment, stateSegment, gitSegment];
+export const DEFAULT_ORDER = ['context', 'model', 'usage', 'state', 'git'];
 
 const GAP = 1;
 const BOX_CHROME = 4; // ╭─ ... ─╮ has 2 border chars + 2 inner spaces
@@ -95,7 +96,6 @@ function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
   const blockCount = blocks.length;
   const blockWidths = blocks.map(b => b.width);
 
-  // Try packing into 1..blockCount rows
   for (let targetRows = 1; targetRows <= blockCount; targetRows++) {
     const totalCombos = Math.pow(targetRows, blockCount);
     const blockRow = new Array<number>(blockCount);
@@ -138,13 +138,11 @@ function solveLayout(blocks: Block[], maxWidth: number): RowGroup[] {
         rows.push({ blocks: rBlocks, widths: rWidths, totalW });
       }
 
-      // Sort rows ascending by width (pyramid shape)
       rows.sort((a, b) => a.totalW - b.totalW);
       return rows.map(r => ({ blocks: r.blocks, widths: r.widths }));
     }
   }
 
-  // Fallback: stacked single blocks
   return blocks.map(b => ({ blocks: [b], widths: [b.width] }));
 }
 

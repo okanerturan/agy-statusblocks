@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import type { AgyStatusData, StatusBlocksConfig } from './types.js';
+import type { AgyStatusData } from './types.js';
 import { render } from './layout.js';
+import { maybeRefreshRemoteUsage } from './remote-usage.js';
 
 function detectWidth(providedWidth?: number): number {
   if (providedWidth && providedWidth > 0) return providedWidth;
@@ -20,6 +21,15 @@ function detectWidth(providedWidth?: number): number {
   return w > 0 ? w : 120;
 }
 
+function coerceNumber(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const parsed = parseFloat(v.replace(/%/g, '').trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 function normalizeInput(raw: unknown): AgyStatusData | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -32,9 +42,9 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
       : 'Gemini';
 
   const cwObj = (obj.context_window && typeof obj.context_window === 'object') ? obj.context_window as Record<string, unknown> : {};
-  const cwSize = typeof cwObj.context_window_size === 'number' ? cwObj.context_window_size : 1048576;
-  const usedPct = typeof cwObj.used_percentage === 'number' ? cwObj.used_percentage : 0;
-  const remPct = typeof cwObj.remaining_percentage === 'number' ? cwObj.remaining_percentage : (100 - usedPct);
+  const cwSize = coerceNumber(cwObj.context_window_size) ?? 1048576;
+  const usedPct = coerceNumber(cwObj.used_percentage) ?? 0;
+  const remPct = coerceNumber(cwObj.remaining_percentage) ?? (100 - usedPct);
 
   const cwd = typeof obj.current_dir === 'string'
     ? obj.current_dir
@@ -51,6 +61,10 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 
   const costObj = (obj.cost && typeof obj.cost === 'object') ? obj.cost as Record<string, unknown> : {};
 
+  // Rate limits
+  const rlObj = (obj.rate_limits && typeof obj.rate_limits === 'object') ? obj.rate_limits as Record<string, any> : undefined;
+  const quotaObj = (obj.quota && typeof obj.quota === 'object') ? obj.quota as Record<string, any> : undefined;
+
   return {
     product: typeof obj.product === 'string' ? obj.product : 'antigravity',
     conversation_id: typeof obj.conversation_id === 'string' ? obj.conversation_id : undefined,
@@ -63,9 +77,11 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
       context_window_size: cwSize,
       used_percentage: usedPct,
       remaining_percentage: remPct,
-      total_input_tokens: typeof cwObj.total_input_tokens === 'number' ? cwObj.total_input_tokens : 0,
-      total_output_tokens: typeof cwObj.total_output_tokens === 'number' ? cwObj.total_output_tokens : 0,
+      total_input_tokens: coerceNumber(cwObj.total_input_tokens) ?? 0,
+      total_output_tokens: coerceNumber(cwObj.total_output_tokens) ?? 0,
     },
+    rate_limits: rlObj,
+    quota: quotaObj,
     current_dir: cwd,
     workspace: { current_dir: cwd },
     vcs: vcs ? {
@@ -73,17 +89,20 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
       branch: typeof vcs.branch === 'string' ? vcs.branch : undefined,
       dirty: typeof vcs.dirty === 'boolean' ? vcs.dirty : undefined,
     } : undefined,
-    artifact_count: typeof obj.artifact_count === 'number' ? obj.artifact_count : 0,
-    task_count: typeof obj.task_count === 'number' ? obj.task_count : 0,
+    artifact_count: coerceNumber(obj.artifact_count) ?? 0,
+    task_count: coerceNumber(obj.task_count) ?? 0,
     subagents: Array.isArray(obj.subagents) ? obj.subagents : [],
     plan_tier: typeof obj.plan_tier === 'string' ? obj.plan_tier : 'Consumer',
-    terminal_width: typeof obj.terminal_width === 'number' ? obj.terminal_width : undefined,
+    terminal_width: coerceNumber(obj.terminal_width),
     cost: {
-      estimated: typeof costObj.estimated === 'number' ? costObj.estimated : undefined,
+      estimated: coerceNumber(costObj.estimated),
     },
     effort: effortLevel ? { level: effortLevel } : undefined,
   };
 }
+
+// Background refresh of remote usage if needed
+maybeRefreshRemoteUsage();
 
 let input = '';
 process.stdin.setEncoding('utf8');

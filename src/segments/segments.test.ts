@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { contextSegment } from './context.js';
 import { modelSegment } from './model.js';
 import { stateSegment } from './state.js';
+import { usageSegment } from './usage.js';
 import { stripAnsi } from '../colors.js';
 import type { AgyStatusData } from '../types.js';
 
 describe('segments', () => {
+  const now = Date.now() / 1000;
   const baseData: AgyStatusData = {
     product: 'antigravity',
     agent_state: 'idle',
@@ -18,6 +20,16 @@ describe('segments', () => {
       used_percentage: 5,
       total_input_tokens: 50000,
       total_output_tokens: 2400,
+    },
+    rate_limits: {
+      five_hour: {
+        used_percentage: 20,
+        resets_at: Math.floor(now + 3600),
+      },
+      seven_day: {
+        used_percentage: 55,
+        resets_at: Math.floor(now + 3600 * 24),
+      },
     },
     current_dir: '/Users/okan/code/test-repo',
     workspace: {
@@ -55,5 +67,15 @@ describe('segments', () => {
     const plain = block.lines.map(stripAnsi).join('\n');
     expect(plain).toContain('● RUNNING');
     expect(plain).toContain('2 tasks · 1 artifact');
+  });
+
+  it('renders usage card with 5h and 7d / daily buckets', () => {
+    const block = usageSegment.render(baseData, 100);
+    expect(block.id).toBe('usage');
+    const plain = block.lines.map(stripAnsi).join('\n');
+    expect(plain).toContain('5h');
+    expect(plain).toContain('7d');
+    expect(plain).toContain('20%');
+    expect(plain).toContain('55%');
   });
 });

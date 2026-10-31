@@ -99,6 +99,7 @@ function runUninstall(): void {
 }
 
 function runPreview(): void {
+  const now = Date.now() / 1000;
   const mockData: AgyStatusData = {
     product: 'antigravity',
     conversation_id: 'preview-session-1234',
@@ -112,6 +113,16 @@ function runPreview(): void {
       used_percentage: 12.4,
       total_input_tokens: 124000,
       total_output_tokens: 6000,
+    },
+    rate_limits: {
+      five_hour: {
+        used_percentage: 18,
+        resets_at: Math.floor(now + 3600 * 2.5),
+      },
+      seven_day: {
+        used_percentage: 64,
+        resets_at: Math.floor(now + 3600 * 42),
+      },
     },
     current_dir: join(homedir(), 'code', 'my-project'),
     workspace: {

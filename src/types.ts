@@ -14,6 +14,17 @@ export interface AgyStatusData {
     total_output_tokens?: number;
     current_usage?: unknown;
   };
+  rate_limits?: {
+    five_hour?: { used_percentage?: number; resets_at?: number | string };
+    seven_day?: { used_percentage?: number; resets_at?: number | string };
+    daily?: { used_percentage?: number; resets_at?: number | string };
+  };
+  quota?: Record<string, {
+    used_percentage?: number;
+    reset_time?: string;
+    resets_at?: number | string;
+    cycle_mode?: string;
+  }>;
   current_dir?: string;
   workspace?: {
     current_dir: string;
@@ -47,7 +58,7 @@ export interface Block {
 export interface Segment {
   id: string;
   priority: number;
-  render(data: AgyStatusData, availWidth: number): Block;
+  render(data: AgyStatusData, allocWidth: number): Block;
   enabled(data: AgyStatusData): boolean;
 }
 
