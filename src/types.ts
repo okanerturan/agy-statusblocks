@@ -1,3 +1,14 @@
+export interface AgyQuotaBucket {
+  remaining_fraction?: number;
+  remaining_amount?: number;
+  reset_time?: string;
+  reset_in_seconds?: number;
+  disabled?: boolean;
+  used_percentage?: number;
+  resets_at?: number | string;
+  cycle_mode?: string;
+}
+
 export interface AgyStatusData {
   product?: string;
   conversation_id?: string;
@@ -5,6 +16,7 @@ export interface AgyStatusData {
   model: {
     id?: string;
     display_name: string;
+    effort?: string;
   };
   context_window: {
     context_window_size: number;
@@ -19,12 +31,7 @@ export interface AgyStatusData {
     seven_day?: { used_percentage?: number; resets_at?: number | string };
     daily?: { used_percentage?: number; resets_at?: number | string };
   };
-  quota?: Record<string, {
-    used_percentage?: number;
-    reset_time?: string;
-    resets_at?: number | string;
-    cycle_mode?: string;
-  }>;
+  quota?: Record<string, AgyQuotaBucket>;
   current_dir?: string;
   workspace?: {
     current_dir: string;
@@ -41,7 +48,9 @@ export interface AgyStatusData {
   plan_tier?: string;
   terminal_width?: number;
   cost?: {
-    estimated?: number;
+    total_usd?: number;
+    subagent_usd?: number;
+    estimated?: number | boolean;
   };
   effort?: {
     level: string;

@@ -178,14 +178,18 @@ function runPreview(): void {
       total_input_tokens: 124000,
       total_output_tokens: 6000,
     },
-    rate_limits: {
-      five_hour: {
-        used_percentage: 18,
-        resets_at: Math.floor(now + 3600 * 2.5),
+    quota: {
+      'Gemini 3.8 Flash': {
+        remaining_fraction: 0.82,
+        reset_in_seconds: Math.floor(3600 * 2.5),
       },
-      seven_day: {
-        used_percentage: 64,
-        resets_at: Math.floor(now + 3600 * 42),
+      'Claude Sonnet 5.5': {
+        remaining_fraction: 0.64,
+        reset_in_seconds: Math.floor(3600 * 4.2),
+      },
+      'Claude Opus 5.5': {
+        remaining_fraction: 0.90,
+        reset_in_seconds: Math.floor(3600 * 4.2),
       },
     },
     current_dir: join(homedir(), 'code', 'my-project'),

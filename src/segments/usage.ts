@@ -33,16 +33,70 @@ function parseResetTime(v: unknown): number {
   return 0;
 }
 
+function shortenBucketLabel(rawKey: string): string {
+  const k = rawKey.trim();
+  const lower = k.toLowerCase();
+  if (lower.includes('sonnet')) {
+    const ver = k.match(/\d+(?:\.\d+)?/)?.[0] ?? '';
+    return ver ? `sonnet ${ver}` : 'sonnet';
+  }
+  if (lower.includes('opus')) {
+    const ver = k.match(/\d+(?:\.\d+)?/)?.[0] ?? '';
+    return ver ? `opus ${ver}` : 'opus';
+  }
+  if (lower.includes('haiku')) {
+    const ver = k.match(/\d+(?:\.\d+)?/)?.[0] ?? '';
+    return ver ? `haiku ${ver}` : 'haiku';
+  }
+  if (lower.includes('flash')) return 'flash';
+  if (lower.includes('argon')) return 'argon';
+  if (lower.includes('pro')) return 'pro';
+  const cleaned = k.replace(/\s*\(.*?\)\s*/g, '').replace(/^gemini\s+/i, '').replace(/^claude\s+/i, '').trim();
+  return cleaned.length > 12 ? cleaned.slice(0, 12) : (cleaned || k);
+}
+
+function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
+  const k = key.toLowerCase();
+  const mName = (data.model?.display_name ?? '').toLowerCase();
+  const mId = (data.model?.id ?? '').toLowerCase();
+  if (k && (mName.includes(k) || mId.includes(k))) return true;
+  for (const token of ['sonnet', 'opus', 'haiku', 'flash', 'argon', 'pro']) {
+    if (k.includes(token) && (mName.includes(token) || mId.includes(token))) return true;
+  }
+  return false;
+}
+
 function extractLimits(data: AgyStatusData): RemoteLimit[] {
   const out: RemoteLimit[] = [];
 
-  // 1. Quota map if provided by Antigravity
+  // 1. Quota map if provided natively by Antigravity (includes Gemini + Claude Sonnet/Opus buckets)
   if (data.quota && typeof data.quota === 'object') {
-    for (const [key, bucket] of Object.entries(data.quota)) {
-      if (!bucket || typeof bucket !== 'object') continue;
-      const pct = clampPercent(bucket.used_percentage);
-      const resetsAt = parseResetTime(bucket.reset_time ?? bucket.resets_at);
-      out.push({ label: key, percent: pct, resetsAt });
+    const entries = Object.entries(data.quota)
+      .filter(([, bucket]) => bucket && typeof bucket === 'object' && !bucket.disabled);
+
+    // Sort active model's bucket first, then by highest utilization
+    entries.sort(([keyA, a], [keyB, b]) => {
+      const actA = isActiveModelBucket(keyA, data) ? 1 : 0;
+      const actB = isActiveModelBucket(keyB, data) ? 1 : 0;
+      if (actA !== actB) return actB - actA;
+      const pctA = typeof a.remaining_fraction === 'number' ? (1 - a.remaining_fraction) * 100 : (a.used_percentage ?? 0);
+      const pctB = typeof b.remaining_fraction === 'number' ? (1 - b.remaining_fraction) * 100 : (b.used_percentage ?? 0);
+      return pctB - pctA;
+    });
+
+    const seenLabels = new Set<string>();
+    for (const [key, bucket] of entries) {
+      const rawPct = typeof bucket.remaining_fraction === 'number'
+        ? (1 - bucket.remaining_fraction) * 100
+        : bucket.used_percentage;
+      const pct = clampPercent(rawPct);
+      const resetsAt = typeof bucket.reset_in_seconds === 'number' && bucket.reset_in_seconds > 0
+        ? Math.floor(Date.now() / 1000) + bucket.reset_in_seconds
+        : parseResetTime(bucket.reset_time ?? bucket.resets_at);
+      const label = shortenBucketLabel(key);
+      if (seenLabels.has(label)) continue;
+      seenLabels.add(label);
+      out.push({ label, percent: pct, resetsAt });
     }
   }
 

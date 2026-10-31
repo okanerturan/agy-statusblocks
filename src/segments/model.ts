@@ -63,16 +63,18 @@ export const modelSegment: Segment = {
     const shortName = fullName.replace(/\s*\(.*?\)\s*/g, '').trim();
 
     // Determine reasoning effort from display name or explicit effort
-    let effort = data.effort?.level;
+    let effort = data.model.effort || data.effort?.level;
     if (!effort) {
       if (fullName.includes('(High)')) effort = 'high';
       else if (fullName.includes('(Medium)')) effort = 'medium';
       else if (fullName.includes('(Low)')) effort = 'low';
+      else if (fullName.includes('(Max)')) effort = 'max';
     }
 
     const currentDir = data.workspace?.current_dir || data.current_dir || process.cwd();
     const tilde = tildeDir(currentDir);
-    const nameStyled = color(shortName, c.gemini, c.bold);
+    const isClaude = /claude|sonnet|opus|haiku/i.test(shortName);
+    const nameStyled = color(shortName, isClaude ? c.orange : c.gemini, c.bold);
     const sep = color(' · ', c.dim);
     const nameLen = visibleLength(nameStyled) + visibleLength(sep);
     const dirBudget = Math.max(allocWidth - nameLen, 0);
@@ -80,10 +82,15 @@ export const modelSegment: Segment = {
 
     const line1 = `${nameStyled}${sep}${color(dir, c.dim)}`;
 
-    const effortStr = effort ? color(effort, EFFORT_COLORS[effort] ?? c.dim) : '';
+    const effortStr = effort ? color(effort.toLowerCase(), EFFORT_COLORS[effort.toLowerCase()] ?? c.dim) : '';
     const tierStr = data.plan_tier ? color(data.plan_tier, c.dim) : '';
-    const costStr = data.cost?.estimated != null && data.cost.estimated > 0
-      ? color(`$${data.cost.estimated.toFixed(3)}`, c.dim)
+    const usd = typeof data.cost?.total_usd === 'number'
+      ? data.cost.total_usd
+      : typeof data.cost?.estimated === 'number'
+        ? data.cost.estimated
+        : 0;
+    const costStr = usd > 0
+      ? color(`${data.cost?.estimated === true ? '~' : ''}$${usd.toFixed(3)}`, c.dim)
       : '';
 
     const parts = [effortStr, tierStr, costStr].filter(Boolean);

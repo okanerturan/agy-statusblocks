@@ -78,4 +78,36 @@ describe('segments', () => {
     expect(plain).toContain('20%');
     expect(plain).toContain('55%');
   });
+
+  it('renders native Antigravity quota buckets including Sonnet 5.5 and Opus 5.5', () => {
+    const quotaData: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: {
+        id: 'claude-sonnet-5.5',
+        display_name: 'Claude Sonnet 5.5 (High)',
+        effort: 'high',
+      },
+      quota: {
+        'Gemini 3.8 Flash': {
+          remaining_fraction: 0.9,
+          reset_in_seconds: 3600,
+        },
+        'Claude Sonnet 5.5': {
+          remaining_fraction: 0.65,
+          reset_in_seconds: 7200,
+        },
+        'Claude Opus 5.5': {
+          remaining_fraction: 0.4,
+          reset_in_seconds: 14400,
+        },
+      },
+    };
+    const block = usageSegment.render(quotaData, 100);
+    const plain = block.lines.map(stripAnsi).join('\n');
+    expect(plain).toContain('sonnet 5.5');
+    expect(plain).toContain('35%');
+    expect(plain).toContain('opus 5.5');
+    expect(plain).toContain('60%');
+  });
 });

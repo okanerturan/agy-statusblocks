@@ -77,10 +77,13 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 
   const vcs = (obj.vcs && typeof obj.vcs === 'object') ? obj.vcs as Record<string, unknown> : undefined;
 
-  let effortLevel: string | undefined;
-  if (modelName.includes('(High)')) effortLevel = 'high';
-  else if (modelName.includes('(Medium)')) effortLevel = 'medium';
-  else if (modelName.includes('(Low)')) effortLevel = 'low';
+  let effortLevel = typeof modelObj.effort === 'string' ? modelObj.effort.toLowerCase() : undefined;
+  if (!effortLevel) {
+    if (modelName.includes('(High)')) effortLevel = 'high';
+    else if (modelName.includes('(Medium)')) effortLevel = 'medium';
+    else if (modelName.includes('(Low)')) effortLevel = 'low';
+    else if (modelName.includes('(Max)')) effortLevel = 'max';
+  }
 
   const costObj = (obj.cost && typeof obj.cost === 'object') ? obj.cost as Record<string, unknown> : {};
 
@@ -94,6 +97,7 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
     model: {
       id: typeof modelObj.id === 'string' ? modelObj.id : 'gemini',
       display_name: modelName,
+      effort: effortLevel,
     },
     context_window: {
       context_window_size: cwSize,
@@ -117,7 +121,9 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
     plan_tier: typeof obj.plan_tier === 'string' ? obj.plan_tier : 'Consumer',
     terminal_width: coerceNumber(obj.terminal_width),
     cost: {
-      estimated: coerceNumber(costObj.estimated),
+      total_usd: coerceNumber(costObj.total_usd),
+      subagent_usd: coerceNumber(costObj.subagent_usd),
+      estimated: typeof costObj.estimated === 'boolean' ? costObj.estimated : coerceNumber(costObj.estimated),
     },
     effort: effortLevel ? { level: effortLevel } : undefined,
   };
