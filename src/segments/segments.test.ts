@@ -205,4 +205,23 @@ describe('segments', () => {
     expect(lines[0]).toContain('gemini 5h');
     expect(lines[1]).toContain('gemini 7d');
   });
+
+  it('shows gemini 5h and 7d when Gemini 4 Argon is active and quota uses gemini-* keys', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'Gemini 4 Argon (High)', display_name: 'Gemini 4 Argon (High)' },
+      quota: {
+        '3p-5h': { remaining_fraction: 0.68, reset_in_seconds: 8100 },
+        '3p-weekly': { remaining_fraction: 0.88, reset_in_seconds: 590000 },
+        'gemini-5h': { remaining_fraction: 0.37, reset_in_seconds: 6660 },
+        'gemini-weekly': { remaining_fraction: 0.87, reset_in_seconds: 590000 },
+      },
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('gemini 5h');
+    expect(lines[0]).toContain('63%');
+    expect(lines[1]).toContain('gemini 7d');
+    expect(lines[1]).toContain('13%');
+  });
 });

@@ -86,7 +86,7 @@ function bucketPool(key: string): 'claude' | 'argon' | 'gemini' | 'other' {
   return 'other';
 }
 
-function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
+function isActiveModelBucket(key: string, data: AgyStatusData, hasExplicitArgonBucket = false): boolean {
   const k = key.toLowerCase();
   const mName = (data.model?.display_name ?? '').toLowerCase();
   const mId = (data.model?.id ?? '').toLowerCase();
@@ -98,8 +98,8 @@ function isActiveModelBucket(key: string, data: AgyStatusData): boolean {
   if ((mName.includes('claude') || mName.includes('sonnet') || mName.includes('opus') || mName.includes('gpt')) && bucketPool(key) === 'claude') {
     return true;
   }
-  // Native Gemini model uses the Gemini pool (but not the separate Argon pool)
-  if (mName.includes('gemini') && !mName.includes('argon') && bucketPool(key) === 'gemini') {
+  // Native Gemini model (including Gemini 4 Argon when no dedicated argon bucket exists) uses the Gemini pool
+  if (mName.includes('gemini') && (!mName.includes('argon') || !hasExplicitArgonBucket) && bucketPool(key) === 'gemini') {
     return true;
   }
   return false;
@@ -112,11 +112,12 @@ function extractLimits(data: AgyStatusData): RemoteLimit[] {
   if (data.quota && typeof data.quota === 'object') {
     const entries = Object.entries(data.quota)
       .filter(([, bucket]) => bucket && typeof bucket === 'object' && !bucket.disabled);
+    const hasExplicitArgonBucket = entries.some(([k]) => bucketPool(k) === 'argon');
 
     // Sort active model's bucket first, then prefer showing distinct pools (Gemini/Argon + Claude), then by highest utilization
     entries.sort(([keyA, a], [keyB, b]) => {
-      const actA = isActiveModelBucket(keyA, data) ? 1 : 0;
-      const actB = isActiveModelBucket(keyB, data) ? 1 : 0;
+      const actA = isActiveModelBucket(keyA, data, hasExplicitArgonBucket) ? 1 : 0;
+      const actB = isActiveModelBucket(keyB, data, hasExplicitArgonBucket) ? 1 : 0;
       if (actA !== actB) return actB - actA;
       if (actA && actB) {
         // Within the active pool, show the short window (5h) before the weekly one
