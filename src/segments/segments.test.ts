@@ -46,6 +46,49 @@ describe('segments', () => {
     expect(plain).toContain('52K/1.0M');
   });
 
+  it('does not add cumulative total_output_tokens when used_percentage reflects total_input_tokens (ContextWindowMetadata)', () => {
+    const compactedData: AgyStatusData = {
+      ...baseData,
+      context_window: {
+        context_window_size: 1000000,
+        used_percentage: 3.0,
+        total_input_tokens: 30000,
+        total_output_tokens: 232000,
+      },
+    };
+    const plain = contextSegment.render(compactedData, 100).lines.map(stripAnsi).join('\n');
+    expect(plain).toContain('3%');
+    expect(plain).toContain('30K/1.0M');
+    expect(plain).not.toContain('262K/1.0M');
+
+    const capturedData: AgyStatusData = {
+      ...baseData,
+      context_window: {
+        context_window_size: 1000000,
+        used_percentage: 13.4484,
+        total_input_tokens: 134484,
+        total_output_tokens: 188065,
+      },
+    };
+    const capturedPlain = contextSegment.render(capturedData, 100).lines.map(stripAnsi).join('\n');
+    expect(capturedPlain).toContain('13%');
+    expect(capturedPlain).toContain('134K/1.0M');
+    expect(capturedPlain).not.toContain('323K/1.0M');
+  });
+
+  it('derives used token count from used_percentage when token counts are omitted', () => {
+    const pctOnlyData: AgyStatusData = {
+      ...baseData,
+      context_window: {
+        context_window_size: 1000000,
+        used_percentage: 21,
+      },
+    };
+    const plain = contextSegment.render(pctOnlyData, 100).lines.map(stripAnsi).join('\n');
+    expect(plain).toContain('21%');
+    expect(plain).toContain('210K/1.0M');
+  });
+
   it('renders model card with cleaned name and directory', () => {
     const block = modelSegment.render(baseData, 100);
     expect(block.id).toBe('model');

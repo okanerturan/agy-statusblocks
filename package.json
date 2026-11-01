@@ -1,6 +1,6 @@
 {
   "name": "agy-statusblocks",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Opinionated, adaptive block-based status line for Antigravity CLI (agy) with bin-packing layout, rate limit tracking, and live agent telemetry",
   "type": "module",
   "bin": {
