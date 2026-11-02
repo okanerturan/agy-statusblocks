@@ -24,14 +24,19 @@ function spreadLine(parts: string[], targetWidth: number): string {
   if (parts.length === 0) return '';
   if (parts.length === 1) return parts[0]!;
 
-  const dot = color(' · ', c.dim);
-  const dotWidth = 3;
   const widths = parts.map(visibleLength);
   const contentWidth = widths.reduce((a, b) => a + b, 0);
   const totalGap = Math.max(0, targetWidth - contentWidth);
+
+  if (parts.length === 2) {
+    return parts[0]! + ' '.repeat(Math.max(1, totalGap)) + parts[1]!;
+  }
+
+  const dot = color(' · ', c.dim);
+  const dotWidth = 3;
   const spareAfterDots = totalGap - dotWidth * (parts.length - 1);
 
-  if (spareAfterDots <= 10) {
+  if (spareAfterDots <= 12) {
     const gaps = parts.length * 2 - 2;
     const base = Math.floor(Math.max(0, spareAfterDots) / gaps);
     const remainder = Math.max(0, spareAfterDots) % gaps;
@@ -92,8 +97,10 @@ export const modelSegment: Segment = {
     const costStr = usd > 0
       ? color(`${data.cost?.estimated === true ? '~' : ''}$${usd.toFixed(3)}`, c.dim)
       : '';
+    const cleanVersion = data.version ? data.version.replace(/^v/i, '').trim() : '';
+    const versionStr = cleanVersion ? color(`v${cleanVersion}`, c.dim) : '';
 
-    const parts = [effortStr, tierStr, costStr].filter(Boolean);
+    const parts = [effortStr, tierStr, costStr, versionStr].filter(Boolean);
     const line2 = spreadLine(parts, visibleLength(line1));
 
     const lines = [line1, line2 || color(shortName, c.dim)];

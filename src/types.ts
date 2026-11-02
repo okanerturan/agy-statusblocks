@@ -11,6 +11,7 @@ export interface AgyQuotaBucket {
 
 export interface AgyStatusData {
   product?: string;
+  version?: string;
   conversation_id?: string;
   agent_state?: 'idle' | 'working' | 'tool_use' | 'reviewing' | 'error' | string;
   model: {

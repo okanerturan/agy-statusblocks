@@ -92,6 +92,7 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 
   return {
     product: typeof obj.product === 'string' ? obj.product : 'antigravity',
+    version: typeof obj.version === 'string' && obj.version.trim() ? obj.version.trim() : undefined,
     conversation_id: typeof obj.conversation_id === 'string' ? obj.conversation_id : undefined,
     agent_state: typeof obj.agent_state === 'string' ? obj.agent_state : 'idle',
     model: {

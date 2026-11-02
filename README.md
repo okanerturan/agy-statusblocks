@@ -30,7 +30,7 @@ Updates happen automatically — the statusline checks for new versions daily in
 | Card | Shows |
 |------|-------|
 | **context** | Context window fill bar, percentage, used/total token count (supports 1M/2M context) |
-| **model** | Active model name, tilde-shortened directory, reasoning effort level, plan tier, estimated cost |
+| **model** | Active model name, tilde-shortened directory, reasoning effort level, plan tier, estimated cost, CLI version |
 | **usage** | Rate limit utilization (5-hour, daily, and 7-day windows) with reset countdowns |
 | **state** | Agent state pill (`● IDLE`, `● RUNNING`, `● TOOL USE`, `● REVIEW`) and live task/subagent/artifact counters |
 | **git** | Branch, staged/modified file counts, lines added/removed |

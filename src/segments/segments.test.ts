@@ -10,6 +10,7 @@ describe('segments', () => {
   const now = Date.now() / 1000;
   const baseData: AgyStatusData = {
     product: 'antigravity',
+    version: '1.4.12',
     agent_state: 'idle',
     model: {
       id: 'gemini-3.8-flash',
@@ -89,13 +90,25 @@ describe('segments', () => {
     expect(plain).toContain('210K/1.0M');
   });
 
-  it('renders model card with cleaned name and directory', () => {
+  it('renders model card with cleaned name, directory, and CLI version', () => {
     const block = modelSegment.render(baseData, 100);
     expect(block.id).toBe('model');
     const plain = block.lines.map(stripAnsi).join('\n');
     expect(plain).toContain('Gemini 3.8 Flash');
     expect(plain).toContain('medium');
     expect(plain).toContain('Consumer');
+    expect(plain).toContain('v1.4.12');
+  });
+
+  it('normalizes v-prefixed version and omits version when absent', () => {
+    const withPrefix = modelSegment.render({ ...baseData, version: 'v1.4.12' }, 100);
+    const plainWithPrefix = withPrefix.lines.map(stripAnsi).join('\n');
+    expect(plainWithPrefix).toContain('v1.4.12');
+    expect(plainWithPrefix).not.toContain('vv1.4.12');
+
+    const withoutVersion = modelSegment.render({ ...baseData, version: undefined }, 100);
+    const plainWithout = withoutVersion.lines.map(stripAnsi).join('\n');
+    expect(plainWithout).not.toContain('v1.4.12');
   });
 
   it('renders state card with pill and counters', () => {

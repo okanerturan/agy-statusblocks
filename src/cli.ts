@@ -182,6 +182,7 @@ function runPreview(borderOverride?: BorderStyle): void {
   const now = Date.now() / 1000;
   const mockData: AgyStatusData = {
     product: 'antigravity',
+    version: '1.4.12',
     conversation_id: 'preview-session-1234',
     agent_state: 'idle',
     model: {
@@ -221,9 +222,6 @@ function runPreview(borderOverride?: BorderStyle): void {
     task_count: 0,
     subagents: [],
     artifact_count: 1,
-    cost: {
-      estimated: 0.005,
-    },
     effort: {
       level: 'medium',
     },
@@ -253,7 +251,7 @@ ${color('Usage:', c.bold)}
 
 ${color('Blocks:', c.bold)}
   context    Context window fill bar, percentage, token counts
-  model      Model name, directory, reasoning effort, tier, cost
+  model      Model name, directory, reasoning effort, tier, cost, version
   usage      5-hour, daily, and 7-day rate limit utilization
   state      Agent state pill and task/subagent/artifact counters
   git        Branch, staged/modified counts, lines added/removed
