@@ -67,12 +67,12 @@ jobs:
           fi
 
           source_sha=
-          for attempt in {1..30}; do
+          for attempt in {1..90}; do
             source_sha=$(npm view "$package@$version" gitHead 2>/dev/null || true)
             if [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
               break
             fi
-            echo "Waiting for $package@$version metadata (attempt $attempt/30)"
+            echo "Waiting for $package@$version metadata (attempt $attempt/90)"
             sleep 6
           done
 
