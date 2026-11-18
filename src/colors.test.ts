@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { color, c, stripAnsi, visibleLength, pctColor, renderBar } from './colors.js';
+import { color, c, stripAnsi, visibleLength, pctColor, renderBar, renderMeterBar } from './colors.js';
 
 describe('colors', () => {
   it('strips ANSI escape sequences accurately', () => {
@@ -21,5 +21,11 @@ describe('colors', () => {
   it('renders progress bar with correct filled length', () => {
     const bar = stripAnsi(renderBar(50, 10));
     expect(bar).toBe('█████▒▒▒▒▒');
+  });
+
+  it('renders meter bar with non-merging glyphs and min-1 filled cell for non-zero pct', () => {
+    expect(stripAnsi(renderMeterBar(0, 8))).toBe('────────');
+    expect(stripAnsi(renderMeterBar(5, 8))).toBe('━───────');
+    expect(stripAnsi(renderMeterBar(50, 8))).toBe('━━━━────');
   });
 });

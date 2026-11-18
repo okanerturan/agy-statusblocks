@@ -48,3 +48,11 @@ export function renderBar(pct: number, width: number): string {
   const filled = Math.min(width, Math.max(0, Math.round(pct * width / 100)));
   return color('█'.repeat(filled), pctColor(pct)) + color('▒'.repeat(width - filled), c.gray);
 }
+
+export function renderMeterBar(pct: number, width: number): string {
+  const clamped = Math.max(0, pct);
+  const filled = clamped > 0
+    ? Math.min(width, Math.max(1, Math.round(clamped * width / 100)))
+    : 0;
+  return color('━'.repeat(filled), pctColor(pct)) + color('─'.repeat(width - filled), c.gray);
+}

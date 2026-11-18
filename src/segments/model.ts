@@ -65,15 +65,13 @@ export const modelSegment: Segment = {
   enabled: () => true,
   render(data, allocWidth) {
     const fullName = data.model.display_name || data.model.id || 'Gemini';
-    const shortName = fullName.replace(/\s*\(.*?\)\s*/g, '').trim();
+    const shortName = fullName.replace(/\s*\((?:low|medium|high|xhigh|max)\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
 
     // Determine reasoning effort from display name or explicit effort
     let effort = data.model.effort || data.effort?.level;
     if (!effort) {
-      if (fullName.includes('(High)')) effort = 'high';
-      else if (fullName.includes('(Medium)')) effort = 'medium';
-      else if (fullName.includes('(Low)')) effort = 'low';
-      else if (fullName.includes('(Max)')) effort = 'max';
+      const m = fullName.match(/\((low|medium|high|xhigh|max)\)/i);
+      if (m?.[1]) effort = m[1].toLowerCase();
     }
 
     const currentDir = data.workspace?.current_dir || data.current_dir || process.cwd();

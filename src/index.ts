@@ -77,12 +77,12 @@ function normalizeInput(raw: unknown): AgyStatusData | null {
 
   const vcs = (obj.vcs && typeof obj.vcs === 'object') ? obj.vcs as Record<string, unknown> : undefined;
 
-  let effortLevel = typeof modelObj.effort === 'string' ? modelObj.effort.toLowerCase() : undefined;
+  let effortLevel = typeof modelObj.effort === 'string' && modelObj.effort.trim()
+    ? modelObj.effort.trim().toLowerCase()
+    : undefined;
   if (!effortLevel) {
-    if (modelName.includes('(High)')) effortLevel = 'high';
-    else if (modelName.includes('(Medium)')) effortLevel = 'medium';
-    else if (modelName.includes('(Low)')) effortLevel = 'low';
-    else if (modelName.includes('(Max)')) effortLevel = 'max';
+    const m = modelName.match(/\((low|medium|high|xhigh|max)\)/i);
+    if (m?.[1]) effortLevel = m[1].toLowerCase();
   }
 
   const costObj = (obj.cost && typeof obj.cost === 'object') ? obj.cost as Record<string, unknown> : {};

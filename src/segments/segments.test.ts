@@ -280,4 +280,110 @@ describe('segments', () => {
     expect(lines[1]).toContain('gemini 7d');
     expect(lines[1]).toContain('13%');
   });
+
+  it('shows gemini 5h and 7d when Orchestrator (Carbon) is active even if 3p-weekly has higher usage', () => {
+    for (const id of ['gemini-pro-orchestrator', 'Orchestrator (Carbon)']) {
+      const data: AgyStatusData = {
+        ...baseData,
+        rate_limits: undefined,
+        model: { id, display_name: 'Orchestrator (Carbon)' },
+        quota: {
+          '3p-5h': { remaining_fraction: 1, reset_in_seconds: 0 },
+          '3p-weekly': { remaining_fraction: 0.49, reset_in_seconds: 6 * 86400 + 11 * 3600 + 39 * 60 },
+          'gemini-5h': { remaining_fraction: 1, reset_in_seconds: 0 },
+          'gemini-weekly': { remaining_fraction: 0.93, reset_in_seconds: 6 * 86400 + 11 * 3600 + 1 * 60 },
+        },
+      };
+      const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+      expect(lines[0]).toContain('gemini 5h');
+      expect(lines[0]).toContain('0%');
+      expect(lines[1]).toContain('gemini 7d');
+      expect(lines[1]).toContain('7%');
+      expect(lines.join('\n')).not.toContain('claude');
+    }
+  });
+
+  it('shows gemini 5h and 7d when Orchestrator (Argon) is active', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'Orchestrator (Argon)', display_name: 'Orchestrator (Argon)' },
+      quota: realQuota,
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('gemini 5h');
+    expect(lines[1]).toContain('gemini 7d');
+  });
+
+  it('handles Gemini 4 Hydrogen (XHigh) and preserves Orchestrator (Carbon) planner name', () => {
+    const hydrogenData: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'gemini-4-hydrogen', display_name: 'Gemini 4 Hydrogen (XHigh)' },
+      quota: realQuota,
+    };
+    const usageLines = usageSegment.render(hydrogenData, 100).lines.map(stripAnsi);
+    expect(usageLines[0]).toContain('gemini 5h');
+    expect(usageLines[1]).toContain('gemini 7d');
+
+    const hydrogenModelLines = modelSegment.render(hydrogenData, 100).lines.map(stripAnsi);
+    expect(hydrogenModelLines[0]).toContain('Gemini 4 Hydrogen');
+    expect(hydrogenModelLines[0]).not.toContain('(XHigh)');
+    expect(hydrogenModelLines[1]).toContain('xhigh');
+
+    const orchData: AgyStatusData = {
+      ...baseData,
+      model: { id: 'gemini-pro-orchestrator', display_name: 'Orchestrator (Carbon)' },
+    };
+    const orchModelLines = modelSegment.render(orchData, 100).lines.map(stripAnsi);
+    expect(orchModelLines[0]).toContain('Orchestrator (Carbon)');
+  });
+
+  it('keeps bucket labels right-aligned when one row has no reset timer', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'gemini-pro-orchestrator', display_name: 'Orchestrator (Carbon)' },
+      quota: {
+        'gemini-5h': { remaining_fraction: 1, reset_in_seconds: 0 },
+        'gemini-weekly': { remaining_fraction: 0.93, reset_in_seconds: 558060 },
+      },
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]!.length).toBe(lines[1]!.length);
+    expect(lines[0]!.indexOf('gemini 5h')).toBe(lines[1]!.indexOf('gemini 7d'));
+    expect(lines[0]).not.toContain('·  ·');
+  });
+
+  it('uses cycle_mode to keep weekly buckets labeled 7d near reset', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'gemini-3.8-flash', display_name: 'Gemini 3.8 Flash' },
+      quota: {
+        'gemini': {
+          remaining_fraction: 0.5,
+          reset_in_seconds: 3600,
+          cycle_mode: 'weekly',
+        },
+      },
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('gemini 7d');
+  });
+
+  it('orders the active per-model bucket before other buckets in the same pool', () => {
+    const data: AgyStatusData = {
+      ...baseData,
+      rate_limits: undefined,
+      model: { id: 'claude-sonnet-5.5', display_name: 'Claude Sonnet 5.5 (High)' },
+      quota: {
+        'Claude Sonnet 5.5': { remaining_fraction: 0.65, reset_in_seconds: 7200 },
+        'Claude Opus 5.5': { remaining_fraction: 0.4, reset_in_seconds: 14400 },
+      },
+    };
+    const lines = usageSegment.render(data, 100).lines.map(stripAnsi);
+    expect(lines[0]).toContain('sonnet 5.5');
+    expect(lines[1]).toContain('opus 5.5');
+  });
 });

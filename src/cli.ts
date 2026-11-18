@@ -182,7 +182,7 @@ function runPreview(borderOverride?: BorderStyle): void {
   const now = Date.now() / 1000;
   const mockData: AgyStatusData = {
     product: 'antigravity',
-    version: '1.4.12',
+    version: '1.5.10',
     conversation_id: 'preview-session-1234',
     agent_state: 'idle',
     model: {
@@ -196,17 +196,21 @@ function runPreview(borderOverride?: BorderStyle): void {
       total_output_tokens: 6000,
     },
     quota: {
-      'Gemini 3.8 Flash': {
+      'gemini-5h': {
         remaining_fraction: 0.82,
         reset_in_seconds: Math.floor(3600 * 2.5),
       },
-      'Claude Sonnet 5.5': {
+      'gemini-weekly': {
+        remaining_fraction: 0.93,
+        reset_in_seconds: Math.floor(86400 * 6 + 3600 * 11),
+      },
+      '3p-5h': {
         remaining_fraction: 0.64,
         reset_in_seconds: Math.floor(3600 * 4.2),
       },
-      'Claude Opus 5.5': {
-        remaining_fraction: 0.90,
-        reset_in_seconds: Math.floor(3600 * 4.2),
+      '3p-weekly': {
+        remaining_fraction: 0.49,
+        reset_in_seconds: Math.floor(86400 * 6 + 3600 * 11),
       },
     },
     current_dir: join(homedir(), 'code', 'my-project'),
